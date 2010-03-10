@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <title>Halobacterium transcriptome structure</title>
+    <script type="text/javascript" src="protovis-r3.1.js"></script>
+    <script type="text/javascript" src="halo.chr.json"></script>
+    <script type="text/javascript" src="transcript.reference.json"></script>
+  </head>
+  <body>
+    <h1>Halobacterium transcriptome structure</h1>
+    <p>A quick hacky mockup of a genome browser using the <a href="http://vis.stanford.edu/protovis/">protovis</a> javascript visualization toolkit. Genes are in yellow in the forward strand, orange in the reverse strand. Blue dots are transcription levels (intensity) measured by <a href="http://en.wikipedia.org/wiki/DNA_microarray">tiling array</a>. See <a href="http://www.nature.com/msb/journal/v5/n1/full/msb200942.html">Prevalence of transcription promoters within archaeal operons and coding sequences</a>, Koide et al., 2009.</p>
+    <p>The probes on the tiling array are spaced 20 base-pairs apart, so a width of 20k is showing about 1000 data points in each strand. The data series are loaded as JSON. Tile tiling array totals about 200k data points for the whole genome (2 megabases). There are 2075 genes on the main chromosome of Halobacterium.</p>
+    <script type="text/javascript+protovis">
+        
+    var view = {};
+    view.left = 1;
+    view.right = 20000;
+    view.w = 860 - 60;
+    view.h = 460 - 20;
+    view.xScale = pv.Scale.linear(view.left,view.right).range(0, view.w);
+
+    var formatLabel = function(gene) {
+        var commonName = gene[5];
+        var name = gene[4];
+        var result = (commonName=="") ? name : commonName;
+        if (result.length * 7 > view.xScale(gene[3] - gene[2] + view.left))
+            return "";
+        else
+            return result;
+    }
+
+    var vis = new pv.Panel()
+        .width(view.w)
+        .height(view.h)
+        .right(60)
+        .bottom(20);
+
+    vis.add(pv.Rule)
+        .top(230);
+
+    var ticksRule = vis.add(pv.Rule)
+        .data(view.xScale.ticks())
+        .left(function(d) Math.round(view.xScale(d)) - .5)
+        .strokeStyle("rgba(128,128,128,.1)");
+
+    var axisLabels = ticksRule.anchor("center").add(pv.Label)
+        .text(function(d) (d.toFixed() / 1000) + 'k' );
+    
+    var genesBar = vis.add(pv.Bar)
+        .data(genes.filter(function(g) g[2] <= view.right && g[3] >= view.left))
+        .left(function(d) view.xScale(d[2]))
+        .right(function(d) view.xScale(view.right - d[3] + view.left))
+        .height(22)
+        .top(function(d) (d[1]=='+') ? 180 : 244)
+        .fillStyle(function(d) (d[1]=='+') ? '#eef000' : '#ddbb00')
+        .strokeStyle('rgba(0,0,0,0.5)')
+        .title(function(d) d[4] + " " + d[5])
+        .cursor("pointer");
+    
+    genesBar.anchor('center').add(pv.Label)
+        .text(formatLabel);
+
+    var transcriptRefFwd = vis.add(pv.Dot)
+        .data(transcriptRefChrFwd.filter(function(feature) feature[0] <= view.right && feature[1] >= view.left))
+        .size(5)
+        .bottom(function(d) d[2] * 12.0 + 250)
+        .left(function(d) view.xScale((d[0] + d[1]) / 2.0))
+        .strokeStyle('rgba(50,100,150,0.4)');
+
+    var transcriptRefRev = vis.add(pv.Dot)
+        .data(transcriptRefChrRev.filter(function(feature) feature[0] <= view.right && feature[1] >= view.left))
+        .size(5)
+        .bottom(function(d) d[2] * 12.0 + 0)
+        .left(function(d) view.xScale((d[0] + d[1]) / 2.0))
+        .strokeStyle('rgba(50,100,150,0.4)');
+
+    vis.render();
+
+    var frm = document.getElementById('formMove');
+    if (frm) {
+        frm.left.value = String(view.left);
+        frm.width.value = String(view.right - view.left + 1);
+    }
+
+    var update = function() {
+        ticksRule.data(view.xScale.ticks());
+        genesBar.data(genes.filter(function(g) g[2] <= view.right && g[3] >= view.left));
+        transcriptRefFwd.data(transcriptRefChrFwd.filter(function(feature) feature[0] <= view.right && feature[1] >= view.left));
+        transcriptRefRev.data(transcriptRefChrRev.filter(function(feature) feature[0] <= view.right && feature[1] >= view.left));
+
+        var frm = document.getElementById('formMove');
+        if (frm) {
+            frm.left.value = String(view.left);
+            frm.width.value = String(view.right - view.left + 1);
+        }
+    }
+    </script>
+    
+    <script type="text/javascript">
+    var output = function(txt) {
+        var p = document.createElement('p');
+        p.appendChild(document.createTextNode("> " + txt));
+        var output = document.getElementById('output');
+        output.appendChild(p);
+    }
+
+    var move = function(left, width) {
+        view.left = left
+        view.right = view.left + width - 1;
+        view.xScale = pv.Scale.linear(view.left,view.right).range(0, view.w);
+        update();
+        vis.render();
+    }
+
+    var pageLeft = function(width) {
+        view.left = Math.max(1,view.left - width);
+        view.right = view.left + width - 1;
+        view.xScale = pv.Scale.linear(view.left,view.right).range(0, view.w);
+        update();
+        vis.render();
+    }
+
+    var pageRight = function(width) {
+        view.left = Math.min(2014239 - width, view.left + width);
+        view.right = view.left + width - 1;
+        view.xScale = pv.Scale.linear(view.left,view.right).range(0, view.w);
+        update();
+        vis.render();
+    }
+    </script>
+    
+    <div><form id="formMove" onSubmit="move(parseInt(this.left.value), parseInt(this.width.value)); return false;">
+      Coordinates: start<input type="text" name="left" style="width:10ex; text-align:right; font-weight:bold;"/>
+      width<input type="text" name="width" style="width:10ex; text-align:right; font-weight:bold;">
+      <input type="button" name="okButton" value="OK"
+        onclick="move(parseInt(this.form.left.value), parseInt(this.form.width.value))"/>
+      <input type="button" name="pageLeftButton" value="<" onclick="pageLeft(parseInt(this.form.width.value))"/>
+      <input type="button" name="pageRightButton" value=">" onclick="pageRight(parseInt(this.form.width.value))"/>      
+    </form></div>
+    
+    <div id="output">
+    </div>
+  </body>
+</html>
